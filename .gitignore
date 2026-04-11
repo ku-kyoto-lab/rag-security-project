@@ -98,3 +98,8 @@ target/
 
 # Virtual environment
 .venv/
+
+
+chroma_db/
+*.pyc
+.DS_Store
