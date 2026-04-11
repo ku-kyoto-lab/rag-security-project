@@ -103,3 +103,4 @@ target/
 chroma_db/
 *.pyc
 .DS_Store
+audit_log.jsonl

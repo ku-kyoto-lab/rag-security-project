@@ -9,6 +9,8 @@ from documents import USER_GROUPS
 from security.input_validation import validate_input
 from security.output_filter import filter_output
 from security.rate_limiter import RateLimiter
+from audit_logger import log_query, log_access_denied
+
 
 load_dotenv()
 
@@ -36,10 +38,12 @@ def rag_query(user_id: str, question: str, top_k: int = 5) -> str:
     # Step0: セキュリティチェック（入力検証・レート制限）
     is_valid, reason = validate_input(question)
     if not is_valid:
+        log_access_denied(user_id, [], question, reason)  # ← 追加
         return f"[入力エラー] {reason}"
 
     is_allowed, reason = limiter.check_rate_limit(user_id)
     if not is_allowed:
+        log_access_denied(user_id, [], question, reason)  # ← 追加
         return f"[レート制限] {reason}"
 
     # Step1: ユーザーグループ取得（Fail Closed）
@@ -104,6 +108,17 @@ def rag_query(user_id: str, question: str, top_k: int = 5) -> str:
     # Step7: トークン消費記録（概算）
     estimated_tokens = len(question) + len(filtered_answer)
     limiter.check_token_limit(user_id, estimated_tokens)
+
+    # Step8: 監査ログ記録　← 追加
+    log_query(
+        user_id=user_id,
+        groups=groups,
+        query=question,
+        docs_retrieved=len(docs),
+        rerank_scores=[r.relevance_score for r in rerank_response.results],
+        response_length=len(filtered_answer),
+        pii_detected=len(warnings) > 0,
+    )
 
     return filtered_answer
 
