@@ -10,3 +10,6 @@ dependencies = [
     "cohere>=5.21.1",
     "python-dotenv>=1.2.2",
 ]
+
+[tool.ruff.format]
+preview = true

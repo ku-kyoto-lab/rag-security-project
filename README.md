@@ -1,73 +1,300 @@
-# RAG Security Project
+# RAG Security Project — Secure RAG Pipeline for Manufacturing Environments
 
-A manufacturing-sector RAG (Retrieval-Augmented Generation) system with ACL-aware retrieval and security implementations, built with ChromaDB, Cohere, and Claude.
+A security-first RAG (Retrieval-Augmented Generation) pipeline designed for manufacturing enterprise environments, where document-level access control, audit trails, and operational continuity are non-negotiable requirements.
+
+Implements ACL-aware retrieval, audit logging, Prompt Injection defense, PII filtering, and event-driven reindexing — mapped to the OWASP LLM Top 10 (2025).
+
+---
 
 ## Overview
 
-This project implements a secure RAG pipeline for manufacturing environments, featuring:
-- **ACL-aware retrieval**: Access control based on user group membership (Fail Closed design)
-- **Prompt Injection defense**: Input validation against known attack patterns (OWASP LLM01)
-- **Output filtering**: PII detection and masking (OWASP LLM05)
-- **Rate limiting**: Request and token consumption controls (OWASP LLM10)
+This project demonstrates how to build a **secure RAG system for manufacturing environments**, where a single misconfigured access control can expose confidential SOPs, design specifications, or financial reports to unauthorized users.
 
-## Project Structure
+The core challenge: *a Vector Store has no concept of "who is allowed to see what."* In a manufacturing plant, a Line A maintenance worker should never retrieve Line B's restricted procedures — and an `all_staff` employee should never access executive-level reports, even if the question is semantically relevant.
 
-    rag-security-project/
-    ├── documents.py          # Sample documents and USER_GROUPS mock
-    ├── chunking.py           # Text chunking with overlap
-    ├── indexing.py           # Embedding and ChromaDB indexing
-    ├── query.py              # ACL → Embed → Rerank → Claude pipeline
-    ├── security/
-    │   ├── __init__.py
-    │   ├── input_validation.py   # LLM01: Prompt Injection defense
-    │   ├── output_filter.py      # LLM05: PII detection and masking
-    │   └── rate_limiter.py       # LLM10: Rate and token limiting
-    ├── .env.example          # Environment variable template
-    └── chroma_db/            # ChromaDB persistent storage (gitignored)
+This project solves that by implementing ACL-aware retrieval at the application layer, following a **Fail Closed** design principle: if user group information cannot be retrieved, access is denied — never silently permitted.
+
+Built as a companion to a blog series on [Zenn](https://zenn.dev/kukyotolab).
+
+---
+
+## Why This Project
+
+Standard RAG implementations retrieve documents based on semantic similarity alone — without regard to access permissions. In manufacturing enterprise environments, this creates risks that are difficult to accept:
+
+- A general employee queries the RAG chatbot and retrieves confidential management reports
+- A maintenance worker on Line A accesses Line B's restricted SOPs through a semantically similar query
+- An outdated SOP (not yet reindexed after revision) is returned to a night-shift worker, leading to incorrect procedure execution
+- A Prompt Injection attack in a production environment extracts sensitive documents via the LLM's response
+
+This project addresses those risks with a layered security architecture:
+
+**Input layer**
+- Prompt Injection detection before the query reaches the LLM
+- Per-user rate limiting to prevent unbounded token consumption
+
+**Retrieval layer**
+- `allowed_groups` embedded at indexing time via Access Label Mapping
+- Fail Closed group resolution at query time (PermissionError if IdP unavailable)
+- Python-side ACL filtering after vector search
+
+**Output layer**
+- PII detection and masking in LLM responses (email, phone, credit card numbers)
+- Script injection pattern removal
+
+**Operations layer**
+- JSONL audit logging for post-incident investigation and compliance (ISO 27001 Annex A 8.15)
+- Event-driven reindexing to ensure SOP revisions are reflected immediately — not overnight
+
+---
+
+## Architecture
+
+### Indexing Pipeline
+
+```
+Source Documents (PDF / Word / Internal Wiki)
+        |
+        v
++-------------------------+
+|   Document Processor    |
+|  - Text extraction      |
+|  - Chunking             |
+|    (200 chars,          |
+|     overlap=20)         |
++-------------------------+
+        |
+        v
++-------------------------+
+|    Metadata Tagger      |
+|  - allowed_groups       |  <-- fetched from IdP (AD / Entra ID)
+|    (Access Label        |
+|     Mapping)            |
+|  - doc_type             |
+|  - department           |
+|  - effective_date       |
++-------------------------+
+        |
+        v
+  Cohere Embed v3
+  (embed-multilingual-v3.0)
+        |
+        v
+  ChromaDB  <-- text + metadata stored together
+```
+
+### Query Pipeline
+
+```
+User Query
+        |
+        v
++-----------------------------+
+| [Step 0] Input Validation   |  security/input_validation.py
+|  - Prompt Injection         |  LLM01
+|    pattern detection        |
+|  - Max length enforcement   |
++-----------------------------+
+        |
+        v
++-----------------------------+
+| [Step 0] Rate Limiter       |  security/rate_limiter.py
+|  - 5 req / 60 sec           |  LLM10
+|  - 10,000 tokens / day      |
+|    (per user)               |
++-----------------------------+
+        |
+        v
++-----------------------------+
+| [Step 1] Group Resolution   |  Fail Closed
+|  - Fetch from IdP           |
+|  - PermissionError if       |
+|    unavailable              |
++-----------------------------+
+        |
+        v
++-----------------------------+
+| [Step 2] Cohere Embed v3    |
+|  input_type: search_query   |
++-----------------------------+
+        |
+        v
++-----------------------------+
+| [Step 3] ChromaDB Search    |
+|  + Python ACL Filtering     |  LLM08
+|  any(g in allowed_groups    |
+|      for g in user_groups)  |
++-----------------------------+
+        |
+        v
++-----------------------------+
+| [Step 4] Cohere Rerank v3.5 |
+|  rerank-multilingual-v3.0   |
++-----------------------------+
+        |
+        v
++-----------------------------+
+| [Step 5] Claude             |
+|  Response generation from   |
+|  retrieved context only     |
++-----------------------------+
+        |
+        v
++-----------------------------+
+| [Step 6] Output Filter      |  security/output_filter.py
+|  - PII masking              |  LLM05
+|    (email / phone /         |
+|     credit card)            |
+|  - Script injection removal |
++-----------------------------+
+        |
+        v
++-----------------------------+
+| [Step 7] Audit Logger       |  audit_logger.py
+|  - JSONL record:            |
+|    user_id, groups, query,  |
+|    docs_retrieved,          |
+|    rerank_scores,           |
+|    pii_detected             |
++-----------------------------+
+        |
+        v
+  Response returned to user
+```
+
+### File Structure
+
+```
+rag-security-project/
+├── documents.py          # Sample documents + USER_GROUPS mock
+├── chunking.py           # Text chunking (200 chars, overlap=20)
+├── indexing.py           # Embed → ChromaDB registration
+├── query.py              # Full ACL-aware query pipeline
+├── audit_logger.py       # JSONL audit log writer
+├── reindex_trigger.py    # Event-driven reindex (Webhook simulation)
+├── security/
+│   ├── __init__.py
+│   ├── input_validation.py   # Prompt Injection defense (LLM01)
+│   ├── output_filter.py      # PII detection and masking (LLM05)
+│   └── rate_limiter.py       # Request and token rate limiting (LLM10)
+├── .env.example
+└── chroma_db/            # Local vector store (gitignored)
+```
+
+---
+
+## OWASP LLM Top 10 Mapping
+
+The implementations here address the following OWASP LLM Top 10 (2025) risk categories. These are foundational controls — not exhaustive mitigations for each category.
+
+| OWASP LLM Risk | Related Implementation | Scope in This Project |
+|---|---|---|
+| LLM01: Prompt Injection | `security/input_validation.py` | Blocklist-based detection for direct injection. Indirect Prompt Injection via retrieved chunks is discussed in Blog Series Part 4. |
+| LLM02: Sensitive Information Disclosure | `query.py` error handling, `security/output_filter.py` | Error messages sanitized; PII masked in LLM responses. |
+| LLM05: Improper Output Handling | `security/output_filter.py` | Regex-based PII detection (email, phone, credit card, API key candidates). Script injection removal. |
+| LLM06: Excessive Agency | System prompt in `query.py` | LLM instructed to answer only from retrieved context ("以下の文書のみを根拠として回答してください"). |
+| LLM08: Vector and Embedding Weaknesses | `indexing.py`, `query.py` | `allowed_groups` embedded at indexing time; enforced at query time via Fail Closed design. |
+| LLM10: Unbounded Consumption | `security/rate_limiter.py` | Per-user request rate (5 req/60s) and daily token limits (10,000 tokens/day). |
+
+---
 
 ## Tech Stack
 
-- **LLM**: Anthropic Claude (claude-sonnet-4-20250514)
-- **Embedding**: Cohere embed-multilingual-v3.0
-- **Reranking**: Cohere rerank-multilingual-v3.0
-- **Vector Store**: ChromaDB (persistent)
-- **Package Manager**: uv
-
-## Setup
-
-    git clone https://github.com/ku-kyoto-lab/rag-security-project.git
-    cd rag-security-project
-    uv add chromadb cohere anthropic python-dotenv
-    cp .env.example .env
-    # Edit .env and add your API keys
-    uv run python indexing.py
-    uv run python query.py
-
-## OWASP LLM Top 10 Coverage
-
-| Implementation | OWASP Category |
+| Layer | Technology |
 |---|---|
-| security/input_validation.py | LLM01: Prompt Injection |
-| security/output_filter.py | LLM05: Improper Output Handling |
-| security/rate_limiter.py | LLM10: Unbounded Consumption |
-| ACL-aware retrieval in query.py | LLM08: Vector and Embedding Weaknesses |
+| Language | Python 3.12 |
+| Package Manager | uv |
+| Vector Store | ChromaDB (local, persistent) |
+| Embedding Model | Cohere Embed v3 (`embed-multilingual-v3.0`) |
+| Reranking Model | Cohere Rerank v3.5 (`rerank-multilingual-v3.0`) |
+| LLM | Anthropic Claude (`claude-sonnet-4-20250514`) |
+| Code Quality | Ruff |
+| Environment | python-dotenv |
 
-## Security Design
+---
 
-### ACL-aware Retrieval (Fail Closed)
-User group membership is verified against a mock IdP on every query. Documents are filtered by allowed_groups metadata before reranking. If group information cannot be retrieved, access is denied.
+## How to Run
 
-### Prompt Injection Defense
-Input is validated against known injection patterns before reaching the RAG pipeline, preventing unnecessary API costs and protecting downstream processing.
+### Prerequisites
 
-### Output Filtering
-Claude's responses are scanned for PII (email addresses, phone numbers, credit card numbers) and code injection patterns before being returned to the user.
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) installed
+- Cohere API key ([dashboard.cohere.com](https://dashboard.cohere.com/))
+- Anthropic API key ([console.anthropic.com](https://console.anthropic.com/))
 
-## Related Articles (Zenn)
+### Setup
 
-- [製造業向けRAGシステムのアクセス制御設計](https://zenn.dev/kukyotolab/articles/ed209091142b2a) — Design
-- [ChromaDB + CohereでACL-aware retrievalを実装する](https://zenn.dev/kukyotolab/articles/f52e4daf35fab2) — Implementation
+```bash
+git clone https://github.com/ku-kyoto-lab/rag-security-project.git
+cd rag-security-project
+
+uv sync
+
+cp .env.example .env
+# Add your API keys to .env:
+#   COHERE_API_KEY=your_key_here
+#   ANTHROPIC_API_KEY=your_key_here
+```
+
+### Build the Index
+
+```bash
+uv run python indexing.py
+# → Indexed 5 chunks from 4 documents
+```
+
+### Run Queries
+
+```bash
+uv run python query.py
+```
+
+Access control in action — same question, three different users:
+
+```
+[tanaka]  groups: ['maintenance_line_a', 'all_staff']
+          docs retrieved (after ACL filter): 3
+          → Returns cooling system SOP correctly ✅
+
+[yamada]  groups: ['all_staff']
+          docs retrieved (after ACL filter): 1
+          → "No relevant documents found for this query." ✅
+
+[suzuki]  groups: ['executive', 'plant_manager', 'all_staff']
+          docs retrieved (after ACL filter): 4
+          → Returns cooling system SOP correctly ✅
+```
+
+### Test Event-Driven Reindex
+
+```bash
+uv run python reindex_trigger.py
+# Simulates a document update Webhook:
+# → Deletes stale chunks → reindexes updated document
+```
+
+---
+
+## Blog Series
+
+This project is documented in a three-part series (written in Japanese):
+
+| # | Title | Link |
+|---|---|---|
+| Part 1 | Access Control Design for Manufacturing RAG Systems | [Zenn →](https://zenn.dev/kukyotolab/articles/ed209091142b2a) |
+| Part 2 | Implementing ACL-Aware Retrieval with ChromaDB + Cohere | [Zenn →](https://zenn.dev/kukyotolab/articles/f52e4daf35fab2) |
+| Part 3 | Audit Logging + Event-Driven Reindexing | [Zenn →](https://zenn.dev/kukyotolab/articles/46e651877241a4) |
+
+---
 
 ## Author
 
-[@kukyotolab](https://zenn.dev/kukyotolab)
+**ku-kyoto-lab**
+Security Consultant | AI Security & Zero Trust Specialist
+
+- GitHub: [ku-kyoto-lab](https://github.com/ku-kyoto-lab)
+- Zenn: [kukyotolab](https://zenn.dev/kukyotolab)
+- LinkedIn: [Profile](https://www.linkedin.com/in/ku-kyoto-lab/)
+
+20+ years in enterprise security (NTT, Zscaler CSM, VMware VCP, Deloitte).
+Currently specializing in LLM application security and OWASP LLM Top 10 implementation.
