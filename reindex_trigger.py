@@ -6,7 +6,6 @@ import cohere
 import chromadb
 from dotenv import load_dotenv
 from chunking import chunk_document
-from audit_logger import log_query
 
 load_dotenv()
 
