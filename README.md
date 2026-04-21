@@ -296,5 +296,4 @@ Security Consultant | AI Security & Zero Trust Specialist
 - Zenn: [kukyotolab](https://zenn.dev/kukyotolab)
 - LinkedIn: [Profile](https://www.linkedin.com/in/ku-kyoto-lab/)
 
-20+ years in enterprise security (NTT, Zscaler CSM, VMware VCP, Deloitte).
-Currently specializing in LLM application security and OWASP LLM Top 10 implementation.
+20+ years in enterprise IT across network engineering, virtualization, zero trust, and cyber consulting (NTT, VMware TAM, Zscaler CSM, Deloitte Tohmatsu Cyber). Currently building expertise in LLM application security and OWASP LLM Top 10 implementation.
