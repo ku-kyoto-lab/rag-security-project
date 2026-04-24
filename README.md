@@ -4,6 +4,12 @@ A security-first RAG (Retrieval-Augmented Generation) pipeline designed for manu
 
 Implements ACL-aware retrieval, audit logging, Prompt Injection defense, PII filtering, and event-driven reindexing — mapped to the OWASP LLM Top 10 (2025).
 
+![Python](https://img.shields.io/badge/Python-3.12-blue)
+![Claude](https://img.shields.io/badge/Claude-claude--sonnet--4-blueviolet)
+![Cohere](https://img.shields.io/badge/Cohere-Embed%20v3%20%2F%20Rerank%20v3.5-coral)
+![OWASP](https://img.shields.io/badge/OWASP%20LLM-Top%2010%202025-red)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 ---
 
 ## Overview
@@ -198,6 +204,22 @@ The implementations here address the following OWASP LLM Top 10 (2025) risk cate
 
 ---
 
+## Key Design Decisions
+
+**Why Python-side ACL filtering instead of ChromaDB metadata filtering?**
+ChromaDB cannot filter on list-type metadata fields — `allowed_groups` is stored as a list, and ChromaDB's `where` clause does not support list membership checks. Filtering at the application layer after vector search is the only reliable approach without changing the data model.
+
+**Why Fail Closed for group resolution?**
+If the IdP (AD/Entra ID) is unavailable, silently granting access is a security failure. Denying access explicitly and logging the event is the safer default for manufacturing environments, where the cost of unauthorized document access exceeds the cost of a temporarily blocked query.
+
+**Why Cohere Rerank after ChromaDB search?**
+Vector search optimizes for recall — it returns the most semantically similar chunks regardless of precise relevance. Rerank re-scores the Top 5 candidates by relevance precision and returns the Top 3. In ACL-filtered results (often 1–3 documents), Rerank prevents a high-similarity but low-relevance chunk from being ranked first and misleading the LLM response.
+
+**Why event-driven reindexing instead of scheduled batch?**
+In manufacturing environments, an outdated SOP returned to a night-shift worker can lead to incorrect procedure execution. Scheduled batch reindexing introduces a window of inconsistency that is operationally unacceptable. Event-driven reindexing (Webhook simulation) ensures SOP revisions are reflected immediately.
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -275,15 +297,34 @@ uv run python reindex_trigger.py
 
 ---
 
+## Known Limitations
+
+- **Mock IdP**: `USER_GROUPS` is a hardcoded dict. Production use requires integration with AD/Entra ID or an LDAP provider.
+- **Local vector store**: ChromaDB runs locally. For production, a managed vector store (e.g., Pinecone, Weaviate) with backup and HA is recommended.
+- **Blocklist-based injection detection**: `input_validation.py` uses pattern matching. Adversarial prompts not in the blocklist will pass through. A classification-based approach (as implemented in `rag-prompt-injection-lab`) provides stronger coverage.
+- **Single-language PII patterns**: `output_filter.py` targets Japanese and English patterns. Other locales require additional regex rules.
+
+---
+
 ## Blog Series
 
-This project is documented in a three-part series (written in Japanese):
+This project is documented in a four-part series (written in Japanese):
 
 | # | Title | Link |
 |---|---|---|
-| Part 1 | Access Control Design for Manufacturing RAG Systems | [Zenn →](https://zenn.dev/kukyotolab/articles/ed209091142b2a) |
-| Part 2 | Implementing ACL-Aware Retrieval with ChromaDB + Cohere | [Zenn →](https://zenn.dev/kukyotolab/articles/f52e4daf35fab2) |
-| Part 3 | Audit Logging + Event-Driven Reindexing | [Zenn →](https://zenn.dev/kukyotolab/articles/46e651877241a4) |
+| Part 1 | Access Control Design for Manufacturing RAG Systems (Japanese) | [Zenn →](https://zenn.dev/kukyotolab/articles/ed209091142b2a) |
+| Part 2 | Implementing ACL-Aware Retrieval with ChromaDB + Cohere (Japanese) | [Zenn →](https://zenn.dev/kukyotolab/articles/f52e4daf35fab2) |
+| Part 3 | Audit Logging + Event-Driven Reindexing (Japanese) | [Zenn →](https://zenn.dev/kukyotolab/articles/46e651877241a4) |
+| Part 4 | Prompt Injection Defense: Comparing Three Approaches (Japanese) | [Zenn →](https://zenn.dev/kukyotolab/articles/bdc38a5cfb27cb) |
+
+---
+
+## Related Projects
+
+| Project | Description |
+|---|---|
+| [rag-prompt-injection-lab](https://github.com/ku-kyoto-lab/rag-prompt-injection-lab) | 3-layer Prompt Injection defense with detection eval (LLM01 / LLM08) |
+| [claude-agent-lab](https://github.com/ku-kyoto-lab/claude-agent-lab) | Single Agent with Human-in-the-Loop approval-gated tool execution (LLM06) |
 
 ---
 
