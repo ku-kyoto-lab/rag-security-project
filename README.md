@@ -325,9 +325,8 @@ This project is documented in a seven-part series (written in Japanese):
 | Part 4 | Prompt Injection Defense: Comparing Three Approaches | [Zenn →](https://zenn.dev/kukyotolab/articles/bdc38a5cfb27cb) |
 | Part 5 | 3-Provider RAG Comparison: Claude / OpenAI / Cohere | [Zenn →](https://zenn.dev/kukyotolab/articles/three-provider-rag-comparison) |
 | Part 6 | Production Operations: Evals / Observability / Prompt Versioning / Fallback | [Zenn →](https://zenn.dev/kukyotolab/articles/llm_production_ops) |
-| Part 7 | From Architecture to Business Value | [Zenn →](https://zenn.dev/kukyotolab) |
+| Part 7 | From Architecture to Business Value | [Zenn →](https://zenn.dev/kukyotolab/articles/manufacturing-rag-business-design) |
 
-> Part 6 and Part 7 links will be updated after publication.
 
 ---
 
