@@ -5,7 +5,7 @@ A security-first RAG (Retrieval-Augmented Generation) pipeline designed for manu
 Implements ACL-aware retrieval, audit logging, Prompt Injection defense, PII filtering, and event-driven reindexing — mapped to the OWASP LLM Top 10 (2025).
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue)
-![Claude](https://img.shields.io/badge/Claude-claude--sonnet--4-blueviolet)
+![Claude](https://img.shields.io/badge/Claude-claude--sonnet--4--6-blueviolet)
 ![Cohere](https://img.shields.io/badge/Cohere-Embed%20v3%20%2F%20Rerank%20v3.5-coral)
 ![OWASP](https://img.shields.io/badge/OWASP%20LLM-Top%2010%202025-red)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -183,6 +183,13 @@ rag-security-project/
 │   ├── input_validation.py   # Prompt Injection defense (LLM01)
 │   ├── output_filter.py      # PII detection and masking (LLM05)
 │   └── rate_limiter.py       # Request and token rate limiting (LLM10)
+├── customer-value-pack/
+│   ├── 01_executive_one_pager.pptx
+│   ├── 02_rollout_plan.pptx
+│   ├── dashboard/
+│   │   ├── generate_dashboard.py
+│   │   └── dashboard_output.html
+│   └── IMPLEMENTATION_MAPPING.md
 ├── .env.example
 └── chroma_db/            # Local vector store (gitignored)
 ```
@@ -229,7 +236,7 @@ In manufacturing environments, an outdated SOP returned to a night-shift worker 
 | Vector Store | ChromaDB (local, persistent) |
 | Embedding Model | Cohere Embed v3 (`embed-multilingual-v3.0`) |
 | Reranking Model | Cohere Rerank v3.5 (`rerank-multilingual-v3.0`) |
-| LLM | Anthropic Claude (`claude-sonnet-4-20250514`) |
+| LLM | Anthropic Claude (`claude-sonnet-4-6`) |
 | Code Quality | Ruff |
 | Environment | python-dotenv |
 
@@ -308,14 +315,19 @@ uv run python reindex_trigger.py
 
 ## Blog Series
 
-This project is documented in a four-part series (written in Japanese):
+This project is documented in a seven-part series (written in Japanese):
 
 | # | Title | Link |
 |---|---|---|
-| Part 1 | Access Control Design for Manufacturing RAG Systems (Japanese) | [Zenn →](https://zenn.dev/kukyotolab/articles/ed209091142b2a) |
-| Part 2 | Implementing ACL-Aware Retrieval with ChromaDB + Cohere (Japanese) | [Zenn →](https://zenn.dev/kukyotolab/articles/f52e4daf35fab2) |
-| Part 3 | Audit Logging + Event-Driven Reindexing (Japanese) | [Zenn →](https://zenn.dev/kukyotolab/articles/46e651877241a4) |
-| Part 4 | Prompt Injection Defense: Comparing Three Approaches (Japanese) | [Zenn →](https://zenn.dev/kukyotolab/articles/bdc38a5cfb27cb) |
+| Part 1 | Access Control Design for Manufacturing RAG Systems | [Zenn →](https://zenn.dev/kukyotolab/articles/ed209091142b2a) |
+| Part 2 | Implementing ACL-Aware Retrieval with ChromaDB + Cohere | [Zenn →](https://zenn.dev/kukyotolab/articles/f52e4daf35fab2) |
+| Part 3 | Audit Logging + Event-Driven Reindexing | [Zenn →](https://zenn.dev/kukyotolab/articles/46e651877241a4) |
+| Part 4 | Prompt Injection Defense: Comparing Three Approaches | [Zenn →](https://zenn.dev/kukyotolab/articles/bdc38a5cfb27cb) |
+| Part 5 | 3-Provider RAG Comparison: Claude / OpenAI / Cohere | [Zenn →](https://zenn.dev/kukyotolab/articles/three-provider-rag-comparison) |
+| Part 6 | Production Operations: Evals / Observability / Prompt Versioning / Fallback | [Zenn →](https://zenn.dev/kukyotolab/articles/llm_production_ops) |
+| Part 7 | From Architecture to Business Value | [Zenn →](https://zenn.dev/kukyotolab) |
+
+> Part 6 and Part 7 links will be updated after publication.
 
 ---
 
@@ -323,7 +335,10 @@ This project is documented in a four-part series (written in Japanese):
 
 | Project | Description |
 |---|---|
+| [rag-security-openai](https://github.com/ku-kyoto-lab/rag-security-openai) | OpenAI edition — same architecture with GPT-4o-mini + OpenAI Vector Store |
+| [rag-security-cohere](https://github.com/ku-kyoto-lab/rag-security-cohere) | Cohere edition — Cohere Embed v3 + Rerank v3 + Command R+ |
 | [rag-prompt-injection-lab](https://github.com/ku-kyoto-lab/rag-prompt-injection-lab) | 3-layer Prompt Injection defense with detection eval (LLM01 / LLM08) |
+| [llm-production-ops](https://github.com/ku-kyoto-lab/llm-production-ops) | Production operations: Evals / Observability / Prompt Versioning / Fallback |
 | [claude-agent-lab](https://github.com/ku-kyoto-lab/claude-agent-lab) | Single Agent with Human-in-the-Loop approval-gated tool execution (LLM06) |
 
 ---
