@@ -16,6 +16,7 @@ def log_query(
     rerank_scores: list[float],
     response_length: int,
     pii_detected: bool,
+    request_id: str | None = None,
 ) -> None:
     """
     RAGクエリの監査ログを記録する。
@@ -24,6 +25,7 @@ def log_query(
     """
     entry = {
         "timestamp": datetime.now().isoformat(),
+        "request_id": request_id,
         "user_id": user_id,
         "groups": groups,
         "query": query,
@@ -63,6 +65,45 @@ def log_access_denied(user_id: str, groups: list[str], query: str, reason: str) 
         print(f"[AUDIT] {json.dumps(entry, ensure_ascii=False, indent=2)}")
 
 
+def log_guardrail_comparison(
+    request_id: str,
+    user_id: str,
+    stage: str,  # "INPUT" または "OUTPUT"
+    text_preview: str,
+    self_built_flagged: bool,
+    self_built_reason: str,
+    guardrail_decision: str,  # "ALLOW" / "MASK" / "BLOCK" / "ERROR"
+    guardrail_reason: str | None,
+    latency_ms_self_built: float,
+    latency_ms_guardrail: float,
+) -> None:
+    """
+    自前実装（input_validation / output_filter）とBedrock Guardrailsの
+    判定結果を比較するための実験用ログ。実運用の判断には使わない（観察のみ）。
+    """
+    entry = {
+        "timestamp": datetime.now().isoformat(),
+        "event": "GUARDRAIL_COMPARISON",
+        "request_id": request_id,
+        "user_id": user_id,
+        "stage": stage,
+        "text_preview": text_preview,
+        "self_built_flagged": self_built_flagged,
+        "self_built_reason": self_built_reason,
+        "guardrail_decision": guardrail_decision,
+        "guardrail_reason": guardrail_reason,
+        "agree": self_built_flagged == (guardrail_decision in ("MASK", "BLOCK")),
+        "latency_ms_self_built": round(latency_ms_self_built, 2),
+        "latency_ms_guardrail": round(latency_ms_guardrail, 2),
+    }
+
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    if DEBUG:
+        print(f"[AUDIT] {json.dumps(entry, ensure_ascii=False, indent=2)}")
+
+
 if __name__ == "__main__":
     # 動作確認
     log_query(
@@ -73,6 +114,19 @@ if __name__ == "__main__":
         rerank_scores=[0.9999, 0.065, 0.0002],
         response_length=312,
         pii_detected=False,
+        request_id="demo-request-id",  # ← 追加
+    )
+    log_guardrail_comparison(  # ← この呼び出しをここに追加
+        request_id="demo-request-id",
+        user_id="tanaka",
+        stage="INPUT",
+        text_preview="冷却システムの点検手順を教えてください",
+        self_built_flagged=False,
+        self_built_reason="",
+        guardrail_decision="ALLOW",
+        guardrail_reason=None,
+        latency_ms_self_built=0.05,
+        latency_ms_guardrail=180.3,
     )
     log_access_denied(
         user_id="tanaka",
