@@ -19,9 +19,12 @@ load_dotenv()
 # クライアント初期化
 co = cohere.Client(os.getenv("COHERE_API_KEY"))
 chroma_client = chromadb.PersistentClient(
-    path="/Users/tamurakumiko/Pythonproject/rag-security-project/chroma_db"
+    path=os.getenv(
+        "CHROMA_PERSIST_DIR",
+        "/Users/tamurakumiko/Pythonproject/rag-security-project/chroma_db",
+    )
 )
-collection = chroma_client.get_collection("rag_docs")
+collection = chroma_client.get_or_create_collection("rag_docs")
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 guardrail_client = BedrockGuardrailClient()
 
