@@ -9,7 +9,9 @@ dependencies = [
     "boto3>=1.43.45",
     "chromadb>=1.5.5",
     "cohere>=5.21.1",
+    "fastapi>=0.141.1",
     "python-dotenv>=1.2.2",
+    "uvicorn>=0.43.0",
 ]
 
 [tool.ruff.format]

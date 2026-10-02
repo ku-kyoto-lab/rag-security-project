@@ -1,0 +1,40 @@
+replicaCount: 1
+
+image:
+  repository: secure-rag
+  tag: local
+  pullPolicy: IfNotPresent   # Stage B（ECR）では Always に変える
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: true
+  className: nginx
+  host: secure-rag.local
+
+# 非機密の設定値はここ。機密情報は書かない
+env:
+  BEDROCK_GUARDRAIL_ID: ""
+  BEDROCK_GUARDRAIL_VERSION: "DRAFT"
+  AWS_REGION: "us-east-1"
+  CHROMA_PERSIST_DIR: "/data/chroma"
+
+# 機密情報は既存Secretを参照するだけ
+# Stage BではこのSecretをExternal Secretsが作るように差し替える
+secretName: secure-rag-secrets
+
+persistence:
+  enabled: true
+  size: 1Gi
+  mountPath: /data/chroma
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
